@@ -1,23 +1,43 @@
 # -*- coding: UTF-8 -*-
-# api/index.py - GitHub Contributions API for hexo-filter-gitcalendar
+# api/index.py - GitHub Contributions API for hexo-filter-gitcalendar (with weekly split)
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests
 
 app = Flask(__name__)
-CORS(app)  # 允许所有跨域请求，解决浏览器 CORS 限制
+CORS(app)  # 允许所有跨域请求
+
+def list_split(items, n):
+    """将列表按每 n 个元素分割成子列表"""
+    return [items[i:i + n] for i in range(0, len(items), n)]
 
 def getdata(name):
-    """从第三方 GitHub 贡献 API 获取数据并返回"""
+    """获取 GitHub 贡献数据并转换为插件需要的格式"""
     try:
-        # 第三方 API 地址，返回的数据包含 total 和 contributions（扁平数组）
         url = f"https://github-contributions-api.jogruber.de/v4/{name}"
-        # 设置超时，避免长时间阻塞
         resp = requests.get(url, timeout=10)
-        resp.raise_for_status()  # 如果状态码不是 200，抛出异常
+        resp.raise_for_status()
         data = resp.json()
-        return data
+        
+        total = data.get("total", 0)
+        days = data.get("contributions", [])
+        
+        # 统一转换为 {date, count} 格式
+        datalist = []
+        for day in days:
+            datalist.append({
+                "date": day.get("date"),
+                "count": day.get("count", 0)
+            })
+        
+        # 按周分割（每7天一组）
+        weekly = list_split(datalist, 7)
+        
+        return {
+            "total": total,
+            "contributions": weekly
+        }
     except requests.exceptions.RequestException as e:
         return {"error": f"Request failed: {str(e)}"}
     except Exception as e:
@@ -51,7 +71,6 @@ def get_calendar_by_query():
     # 2. 尝试直接使用原始查询字符串（插件可能发送 ?Sunrisepeak）
     qs = request.query_string.decode('utf-8')
     if qs and '=' not in qs:
-        # 查询字符串中不包含等号，将其整体作为用户名
         username = qs
         return jsonify(getdata(username))
 
