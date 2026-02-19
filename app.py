@@ -17,6 +17,7 @@ def getdata(name):
     datacount = datacountreg.findall(data)
     datacount = list(map(int, [0 if i == "No" else i for i in datacount]))
 
+    # 将datadate和datacount按照字典序排序
     sorted_data = sorted(zip(datadate, datacount))
     datadate, datacount = zip(*sorted_data)
     
@@ -32,11 +33,11 @@ def getdata(name):
         "contributions": datalistsplit
     }
 
-@app.route('/')
+@app.route('/', strict_slashes=False)
 def home():
     return jsonify({
         "message": "GitHub Calendar API",
-        "usage": "/?user=username 或 /<username> 获取用户贡献数据"
+        "usage": "/<username> 获取用户贡献数据，例如 /abbkirito"
     })
 
 @app.route('/<username>')
@@ -45,8 +46,7 @@ def get_calendar(username):
         data = getdata(username)
         return jsonify(data)
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": str(e), "username": username}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
-
