@@ -1,40 +1,36 @@
-# -*- coding: UTF-8 -*- author：abbkirito
-from flask import Flask, jsonify, request
+# -*- coding: UTF-8 -*-
+# author：abbkirito
+from flask import Flask, jsonify
 import requests
-import re
+from flask_cors import CORS  # 需安装：pip install flask-cors
 
 app = Flask(__name__)
-
-def list_split(items, n):
-    return [items[i:i + n] for i in range(0, len(items), n)]
+CORS(app)  # 允许所有跨域请求（解决前端跨域问题）
 
 def getdata(name):
     try:
-        # 使用第三方 GitHub 贡献 API
+        # 调用第三方 GitHub 贡献 API
         response = requests.get(f"https://github-contributions-api.jogruber.de/v4/{name}")
         data = response.json()
         
-        # 解析返回的数据
-        contributions = data.get("total", 0)
-        days = data.get("contributions", [])
+        # 提取 total 和 contributions（扁平数组）
+        total = data.get("total", 0)
+        contributions = data.get("contributions", [])  # 已经是扁平数组
         
-        # 转换为需要的格式
-        datalist = []
-        for day in days:
-            itemlist = {
-                "date": day.get("date"),
-                "count": day.get("count", 0)
-            }
-            datalist.append(itemlist)
+        # 确保每个条目包含 date 和 count（第三方 API 已包含）
+        flat_contributions = [
+            {"date": item["date"], "count": item["count"]}
+            for item in contributions
+        ]
         
-        datalistsplit = list_split(datalist, 7)
-        
+        # 返回插件可能期望的格式（包含 total 和扁平 contributions）
         return {
-            "total": contributions,
-            "contributions": datalistsplit
+            "total": total,
+            "contributions": flat_contributions
         }
     except Exception as e:
         return {"error": str(e)}
+
 @app.route('/', strict_slashes=False)
 def home():
     return jsonify({
@@ -44,11 +40,8 @@ def home():
 
 @app.route('/<username>')
 def get_calendar(username):
-    try:
-        data = getdata(username)
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({"error": str(e), "username": username}), 500
+    data = getdata(username)
+    return jsonify(data)
 
 if __name__ == '__main__':
     app.run(debug=True)
