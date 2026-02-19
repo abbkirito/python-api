@@ -39,9 +39,9 @@ def home():
     })
 
 @app.route('/<username>')
+@app.route('/<username>/')
 def get_calendar(username):
     data = getdata(username)
     return jsonify(data)
-
 if __name__ == '__main__':
     app.run(debug=True)
