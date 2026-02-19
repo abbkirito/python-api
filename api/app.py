@@ -49,3 +49,6 @@ def get_calendar(username):
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+# 文件末尾添加
+handler = app
