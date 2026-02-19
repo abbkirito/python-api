@@ -7,45 +7,34 @@ app = Flask(__name__)
 
 def list_split(items, n):
     return [items[i:i + n] for i in range(0, len(items), n)]
+
 def getdata(name):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
-    gitpage = requests.get(f"https://github.com/{name}", headers=headers)
-    data = gitpage.text
-    
-    # 新的正则表达式 - 匹配 GitHub 2024+ 的贡献图数据
-    # 格式: data-date="YYYY-MM-DD" data-level="N"
-    pattern = re.compile(r'data-date="(\d{4}-\d{2}-\d{2})"[^>]*data-level="(\d+)"')
-    matches = pattern.findall(data)
-    
-    if not matches:
-        # 尝试另一种可能的格式
-        pattern = re.compile(r'(\d{4}-\d{2}-\d{2})[^"]*"(\d+)"[^>]*contribution')
-        matches = pattern.findall(data)
-    
-    if not matches:
-        return {"error": "No contribution data found", "matches_count": 0}
-    
-    # 解析匹配结果
-    datadate = [m[0] for m in matches]
-    datacount = [int(m[1]) for m in matches]
-    
-    # 排序
-    sorted_data = sorted(zip(datadate, datacount))
-    datadate, datacount = zip(*sorted_data)
-    
-    contributions = sum(datacount)
-    datalist = []
-    for index, item in enumerate(datadate):
-        itemlist = {"date": item, "count": datacount[index]}
-        datalist.append(itemlist)
-    datalistsplit = list_split(datalist, 7)
-    
-    return {
-        "total": contributions,
-        "contributions": datalistsplit
-    }
+    try:
+        # 使用第三方 GitHub 贡献 API
+        response = requests.get(f"https://github-contributions-api.jogruber.de/v4/{name}")
+        data = response.json()
+        
+        # 解析返回的数据
+        contributions = data.get("total", 0)
+        days = data.get("contributions", [])
+        
+        # 转换为需要的格式
+        datalist = []
+        for day in days:
+            itemlist = {
+                "date": day.get("date"),
+                "count": day.get("count", 0)
+            }
+            datalist.append(itemlist)
+        
+        datalistsplit = list_split(datalist, 7)
+        
+        return {
+            "total": contributions,
+            "contributions": datalistsplit
+        }
+    except Exception as e:
+        return {"error": str(e)}
 @app.route('/', strict_slashes=False)
 def home():
     return jsonify({
