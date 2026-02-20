@@ -1,12 +1,35 @@
 # -*- coding: UTF-8 -*-
-# api/index.py - GitHub Contributions API (flat array + total)
+# api/index.py - GitHub Contributions API (flat array padded to multiple of 7)
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app)
+
+def pad_to_weekly(data):
+    """将扁平数组填充到长度为7的倍数，用未来日期的空数据填充"""
+    if not data:
+        return data
+    remainder = len(data) % 7
+    if remainder == 0:
+        return data
+    # 需要填充的天数
+    pad_days = 7 - remainder
+    # 获取最后一个日期
+    last_date_str = data[-1]["date"]
+    last_date = datetime.strptime(last_date_str, "%Y-%m-%d")
+    # 生成填充数据
+    padded = data[:]
+    for i in range(1, pad_days + 1):
+        new_date = last_date + timedelta(days=i)
+        padded.append({
+            "date": new_date.strftime("%Y-%m-%d"),
+            "count": 0
+        })
+    return padded
 
 def getdata(name):
     try:
@@ -14,8 +37,14 @@ def getdata(name):
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         data = resp.json()
-        # 直接返回第三方 API 的原始结构（它已经是扁平数组 + total）
-        return data
+        # 提取扁平数组
+        contributions = data.get("contributions", [])
+        # 填充到7的倍数
+        padded_contributions = pad_to_weekly(contributions)
+        return {
+            "total": data.get("total", 0),
+            "contributions": padded_contributions
+        }
     except Exception as e:
         return {"error": str(e)}
 
