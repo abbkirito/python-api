@@ -20,8 +20,10 @@ def getdata(name):
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         data = resp.json()
-        total = data.get("total", 0)
         days = data.get("contributions", [])  # 扁平数组，每个元素包含 date 和 count
+
+        # 手动计算总贡献数（确保是整数）
+        total = sum(day.get("count", 0) for day in days)
 
         # 按7天分割成周
         weekly = list_split(days, 7)
