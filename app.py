@@ -9,21 +9,13 @@ app = Flask(__name__)
 CORS(app)
 
 def getdata(name):
-    """获取 GitHub 贡献数据，返回扁平数组 + total"""
     try:
         url = f"https://github-contributions-api.jogruber.de/v4/{name}"
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         data = resp.json()
-        
-        total = data.get("total", 0)
-        days = data.get("contributions", [])  # 第三方 API 返回的已经是扁平对象数组
-        
-        # 直接使用扁平数组，不进行分割
-        return {
-            "total": total,
-            "contributions": days  # 一维数组，每个元素包含 date 和 count
-        }
+        # 直接返回第三方 API 的原始结构（它已经是扁平数组 + total）
+        return data
     except Exception as e:
         return {"error": str(e)}
 
@@ -37,7 +29,6 @@ def home():
 @app.route('/api', strict_slashes=False)
 @app.route('/', strict_slashes=False)
 def get_calendar():
-    # 优先获取 username 参数
     username = request.args.get('username')
     if not username:
         qs = request.query_string.decode('utf-8')
@@ -45,7 +36,6 @@ def get_calendar():
             username = qs
     if not username:
         return jsonify({"error": "Missing username"}), 400
-    
     return jsonify(getdata(username))
 
 @app.route('/<username>', strict_slashes=False)
