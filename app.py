@@ -1,5 +1,5 @@
 # -*- coding: UTF-8 -*-
-# api/index.py - GitHub Contributions API (flat array padded to multiple of 7)
+# api/index.py - GitHub Contributions API (符合插件源码要求)
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -9,27 +9,47 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 CORS(app)
 
-def pad_to_weekly(data):
-    """将扁平数组填充到长度为7的倍数，用未来日期的空数据填充"""
-    if not data:
-        return data
-    remainder = len(data) % 7
-    if remainder == 0:
-        return data
-    # 需要填充的天数
-    pad_days = 7 - remainder
-    # 获取最后一个日期
-    last_date_str = data[-1]["date"]
-    last_date = datetime.strptime(last_date_str, "%Y-%m-%d")
-    # 生成填充数据
-    padded = data[:]
-    for i in range(1, pad_days + 1):
-        new_date = last_date + timedelta(days=i)
-        padded.append({
-            "date": new_date.strftime("%Y-%m-%d"),
-            "count": 0
-        })
-    return padded
+def list_split(items, n):
+    """将列表按每 n 个元素分割成子列表"""
+    return [items[i:i + n] for i in range(0, len(items), n)]
+
+def pad_to_53_weeks(contributions_flat):
+    """
+    将扁平贡献数组转换为插件期望的二维数组（53周，每周7天）
+    如果不足53周，前面补空数据；如果最后一周不足7天，填充至7天。
+    """
+    # 先按7天分割
+    weekly = list_split(contributions_flat, 7)
+    # 确保有53周
+    total_weeks = len(weekly)
+    if total_weeks < 53:
+        # 需要在前面补足缺失的周（用空数据）
+        # 计算需要补充的周数
+        need = 53 - total_weeks
+        # 创建空周数据：每周7天，日期从最早日期往前推算
+        if contributions_flat:
+            first_date = datetime.strptime(contributions_flat[0]["date"], "%Y-%m-%d")
+        else:
+            # 如果没有数据，用当前日期
+            first_date = datetime.now()
+        empty_weeks = []
+        for i in range(need):
+            week_start = first_date - timedelta(weeks=need - i)  # 依次向前推
+            week = []
+            for j in range(7):
+                date = week_start + timedelta(days=j)
+                week.append({"date": date.strftime("%Y-%m-%d"), "count": 0})
+            empty_weeks.append(week)
+        weekly = empty_weeks + weekly
+    # 如果最后一周不足7天，填充至7天
+    if weekly[-1] and len(weekly[-1]) < 7:
+        last_week = weekly[-1]
+        pad_days = 7 - len(last_week)
+        last_date = datetime.strptime(last_week[-1]["date"], "%Y-%m-%d")
+        for i in range(1, pad_days + 1):
+            new_date = last_date + timedelta(days=i)
+            last_week.append({"date": new_date.strftime("%Y-%m-%d"), "count": 0})
+    return weekly
 
 def getdata(name):
     try:
@@ -37,13 +57,13 @@ def getdata(name):
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         data = resp.json()
-        # 提取扁平数组
-        contributions = data.get("contributions", [])
-        # 填充到7的倍数
-        padded_contributions = pad_to_weekly(contributions)
+        total = data.get("total", 0)
+        contributions_flat = data.get("contributions", [])
+        # 转换为插件需要的53周二维数组
+        weekly = pad_to_53_weeks(contributions_flat)
         return {
-            "total": data.get("total", 0),
-            "contributions": padded_contributions
+            "total": total,
+            "contributions": weekly
         }
     except Exception as e:
         return {"error": str(e)}
